@@ -110,13 +110,11 @@ class FlutterSmsPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
 
     private fun requestSmsPermission() {
         activity?.let {
-            if (shouldShowRequestPermissionRationale(it, Manifest.permission.SEND_SMS)) else {
-                ActivityCompat.requestPermissions(
-                    it,
-                    arrayOf(Manifest.permission.SEND_SMS),
-                    REQUEST_CODE_PERMISSION
-                )
-            }
+            ActivityCompat.requestPermissions(
+                it,
+                arrayOf(Manifest.permission.SEND_SMS),
+                REQUEST_CODE_PERMISSION
+            )
         }
     }
 
