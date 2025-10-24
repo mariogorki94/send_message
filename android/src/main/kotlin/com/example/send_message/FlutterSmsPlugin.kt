@@ -12,6 +12,7 @@ import android.telephony.SmsManager
 import android.util.Log
 import androidx.annotation.NonNull
 import androidx.core.app.ActivityCompat
+import androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -109,11 +110,13 @@ class FlutterSmsPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
 
     private fun requestSmsPermission() {
         activity?.let {
-            ActivityCompat.requestPermissions(
-                it,
-                arrayOf(Manifest.permission.SEND_SMS),
-                REQUEST_CODE_PERMISSION
-            )
+            if (shouldShowRequestPermissionRationale(it, Manifest.permission.SEND_SMS)) else {
+                ActivityCompat.requestPermissions(
+                    it,
+                    arrayOf(Manifest.permission.SEND_SMS),
+                    REQUEST_CODE_PERMISSION
+                )
+            }
         }
     }
 
@@ -203,6 +206,12 @@ class FlutterSmsPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 pendingSent?.let {
                     sendSMSDirect(it.result, it.recipients, it.message)
+                    pendingSent = null
+                }
+                return true
+            } else {
+                pendingSent?.let {
+                    it.result.error("permission_denied", "Permission denied", null)
                     pendingSent = null
                 }
                 return true
