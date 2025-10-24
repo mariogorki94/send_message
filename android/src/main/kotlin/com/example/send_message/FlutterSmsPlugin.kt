@@ -161,7 +161,10 @@ class FlutterSmsPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
             PendingIntent.getBroadcast(currentActivity, 0, Intent("SMS_SENT_ACTION"), 0)
         }
 
-        val mSmsManager = SmsManager.getDefault()
+        val mSmsManager = activity?.getSystemService(SmsManager::class.java) ?: run {
+            result.error("no_sms_manager", "SmsManager is not available", null)
+            return
+        }
         val numbers = phones.split(";")
 
         for (num in numbers) {
