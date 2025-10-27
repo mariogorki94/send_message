@@ -15,6 +15,7 @@ import android.telephony.SmsManager
 import android.util.Log
 import androidx.annotation.NonNull
 import androidx.core.app.ActivityCompat
+import androidx.core.app.ActivityCompat.RECEIVER_EXPORTED
 import androidx.core.app.ActivityCompat.shouldShowRequestPermissionRationale
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -49,12 +50,11 @@ class FlutterSmsPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
-        activity?.registerReceiver(this, IntentFilter(SENT_INTENT))
+        activity?.registerReceiver(this, IntentFilter(SENT_INTENT), RECEIVER_EXPORTED)
         binding.addRequestPermissionsResultListener(this)
     }
 
     override fun onDetachedFromActivity() {
-        activity?.unregisterReceiver(this)
         activity = null
     }
 
@@ -86,14 +86,6 @@ class FlutterSmsPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     override fun onMethodCall(call: MethodCall, result: Result) {
         when (call.method) {
             "sendSMS" -> {
-//                if (!canSendSMS()) {
-//                    result.error(
-//                        "device_not_capable",
-//                        "The current device is not capable of sending text messages.",
-//                        "A device may be unable to send messages if it does not support messaging or if it is not currently configured to send messages. This only applies to the ability to send text messages via iMessage, SMS, and MMS."
-//                    )
-//                    return
-//                }
                 val message = call.argument<String?>("message") ?: ""
                 val recipients = call.argument<String?>("recipients") ?: ""
                 val sendDirect = call.argument<Boolean?>("sendDirect") ?: false
@@ -157,16 +149,7 @@ class FlutterSmsPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
         }
 
         // SmsManager is android.telephony
-        val sentIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PendingIntent.getBroadcast(
-                currentActivity,
-                0,
-                Intent(SENT_INTENT),
-                PendingIntent.FLAG_IMMUTABLE
-            )
-        } else {
-            PendingIntent.getBroadcast(currentActivity, 0, Intent(SENT_INTENT), 0)
-        }
+        val sentIntent = PendingIntent.getBroadcast(currentActivity, 0, Intent(SENT_INTENT), PendingIntent.FLAG_IMMUTABLE)
 
         val mSmsManager = activity?.getSystemService(SmsManager::class.java) ?: run {
             result.error("no_sms_manager", "SmsManager is not available", null)
@@ -225,19 +208,20 @@ class FlutterSmsPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
     }
 
     override fun onReceive(context: Context?, intent: Intent?) {
-       when (resultCode) {
-           Activity.RESULT_OK -> {
-               pendingSent?.let {
-                   it.result.success("SMS Sent!")
-                   pendingSent = null
-               }
-           }
-           else -> {
-               pendingSent?.let {
-                   it.result.error("sms_failed", "SMS failed", null)
-                   pendingSent = null
-               }
-           }
-       }
+        when (resultCode) {
+            Activity.RESULT_OK -> {
+                pendingSent?.let {
+                    it.result.success("SMS Sent!")
+                    pendingSent = null
+                }
+            }
+
+            else -> {
+                pendingSent?.let {
+                    it.result.error("sms_failed", "SMS failed", null)
+                    pendingSent = null
+                }
+            }
+        }
     }
 }
