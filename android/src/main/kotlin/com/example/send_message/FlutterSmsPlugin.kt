@@ -4,7 +4,10 @@ import android.Manifest
 import android.annotation.TargetApi
 import android.app.Activity
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -36,19 +39,22 @@ class PendingSent {
 }
 
 class FlutterSmsPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
-    PluginRegistry.RequestPermissionsResultListener {
+    PluginRegistry.RequestPermissionsResultListener, BroadcastReceiver() {
     private lateinit var mChannel: MethodChannel
     private var activity: Activity? = null
     private val REQUEST_CODE_SEND_SMS = 205
     private val REQUEST_CODE_PERMISSION = 206
+    private val SENT_INTENT = "SMS_SENT_ACTION"
     private var pendingSent: PendingSent? = null
 
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
+        activity?.registerReceiver(this, IntentFilter(SENT_INTENT))
         binding.addRequestPermissionsResultListener(this)
     }
 
     override fun onDetachedFromActivity() {
+        activity?.unregisterReceiver(this)
         activity = null
     }
 
@@ -155,11 +161,11 @@ class FlutterSmsPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
             PendingIntent.getBroadcast(
                 currentActivity,
                 0,
-                Intent("SMS_SENT_ACTION"),
+                Intent(SENT_INTENT),
                 PendingIntent.FLAG_IMMUTABLE
             )
         } else {
-            PendingIntent.getBroadcast(currentActivity, 0, Intent("SMS_SENT_ACTION"), 0)
+            PendingIntent.getBroadcast(currentActivity, 0, Intent(SENT_INTENT), 0)
         }
 
         val mSmsManager = activity?.getSystemService(SmsManager::class.java) ?: run {
@@ -178,7 +184,7 @@ class FlutterSmsPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
             }
         }
 
-        result.success("SMS Sent!")
+        pendingSent = PendingSent(message, phones, result)
     }
 
     private fun sendSMSDialog(result: Result, phones: String, message: String) {
@@ -216,5 +222,22 @@ class FlutterSmsPlugin : FlutterPlugin, MethodCallHandler, ActivityAware,
             }
         }
         return false
+    }
+
+    override fun onReceive(context: Context?, intent: Intent?) {
+       when (resultCode) {
+           Activity.RESULT_OK -> {
+               pendingSent?.let {
+                   it.result.success("SMS Sent!")
+                   pendingSent = null
+               }
+           }
+           else -> {
+               pendingSent?.let {
+                   it.result.error("sms_failed", "SMS failed", null)
+                   pendingSent = null
+               }
+           }
+       }
     }
 }
